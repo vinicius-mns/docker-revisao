@@ -1,14 +1,7 @@
 import { type InferSchemaType, Schema, model } from 'mongoose'
-import { nanoid } from 'nanoid'
 
 const cardSchema = new Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-      default: () => nanoid(8),
-    },
     ownerId: {
       type: String,
       required: true,

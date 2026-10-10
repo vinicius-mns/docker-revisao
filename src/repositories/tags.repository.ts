@@ -1,26 +1,28 @@
-import { nanoid } from 'nanoid'
-
-import { CardModel } from '../models/card.model.js'
-import { TagModel } from '../models/tag.model.js'
-import type { ReadTagsQuery } from '../schemas/tags.schema.js'
+import { CardModel } from '../models/card.model.ts'
+import { TagModel } from '../models/tag.model.ts'
+import type { ReadTagsQuery } from '../schemas/tags.schema.ts'
 
 const PAGE_SIZE = 5000
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const toTag = <T extends { _id: { toString(): string } }>({ _id, ...tag }: T) => ({
+  id: _id.toString(),
+  ...tag,
+})
 
 export const tagsRepository = {
   async create(ownerId: string, tags: { emoji: string; content: string; type: 'include' | 'exclude' | 'none' }[]) {
     const now = Date.now()
     const docs = tags.map((tag, index) => ({
       ...tag,
-      id: nanoid(8),
       ownerId,
       count: 0,
       timestamp: now + index,
     }))
 
-    await TagModel.insertMany(docs)
-    return docs
+    const created = await TagModel.insertMany(docs)
+    return created.map((doc) => toTag(doc.toObject()))
   },
 
   async read(ownerId: string, { cursor, content, type }: ReadTagsQuery) {
@@ -38,10 +40,12 @@ export const tagsRepository = {
       filter.type = type
     }
 
-    const tags = await TagModel.find(filter)
+    const docs = await TagModel.find(filter)
       .sort({ timestamp: -1 })
       .limit(PAGE_SIZE)
       .lean()
+
+    const tags = docs.map(toTag)
 
     return {
       tags,
@@ -53,7 +57,7 @@ export const tagsRepository = {
   async update(ownerId: string, tags: { id: string; emoji: string; content: string; type: 'include' | 'exclude' | 'none' }[]) {
     const operations = tags.map(({ id, ...changes }) => ({
       updateOne: {
-        filter: { ownerId, id },
+        filter: { ownerId, _id: id },
         update: { $set: changes },
       },
     }))
@@ -62,7 +66,7 @@ export const tagsRepository = {
   },
 
   async deleteByIds(ownerId: string, ids: string[]) {
-    const result = await TagModel.deleteMany({ ownerId, id: { $in: ids } })
+    const result = await TagModel.deleteMany({ ownerId, _id: { $in: ids } })
     return result.deletedCount ?? 0
   },
 
@@ -72,14 +76,14 @@ export const tagsRepository = {
   },
 
   async changeType(ownerId: string, ids: string[], type: 'include' | 'exclude' | 'none') {
-    const result = await TagModel.updateMany({ ownerId, id: { $in: ids } }, { $set: { type } })
+    const result = await TagModel.updateMany({ ownerId, _id: { $in: ids } }, { $set: { type } })
     return result.modifiedCount ?? 0
   },
 
   async setType(ownerId: string, entries: { ids: string[]; type: 'include' | 'exclude' | 'none' }[]) {
     const operations = entries.map(({ ids, type }) => ({
       updateMany: {
-        filter: { ownerId, id: { $in: ids } },
+        filter: { ownerId, _id: { $in: ids } },
         update: { $set: { type } },
       },
     }))
@@ -90,7 +94,7 @@ export const tagsRepository = {
 
   async increment(ownerId: string, ids: string[], by = 1) {
     const result = await TagModel.updateMany(
-      { ownerId, id: { $in: ids } },
+      { ownerId, _id: { $in: ids } },
       [{ $set: { count: { $max: [0, { $add: ['$count', by] }] } } }],
     )
 
@@ -100,7 +104,7 @@ export const tagsRepository = {
   async decrement(ownerId: string, decrements: Record<string, number>) {
     const operations = Object.entries(decrements).map(([id, value]) => ({
       updateOne: {
-        filter: { ownerId, id },
+        filter: { ownerId, _id: id },
         update: [{ $set: { count: { $max: [0, { $subtract: ['$count', value] }] } } }],
       },
     }))
@@ -122,7 +126,7 @@ export const tagsRepository = {
       await TagModel.bulkWrite(
         counts.map(({ _id, count }) => ({
           updateOne: {
-            filter: { ownerId, id: _id },
+            filter: { ownerId, _id },
             update: { $set: { count } },
           },
         })),

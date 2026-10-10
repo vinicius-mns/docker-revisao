@@ -1,13 +1,16 @@
-import { nanoid } from 'nanoid'
-
-import { CardModel } from '../models/card.model.js'
-import { TagModel } from '../models/tag.model.js'
-import type { ReadCardsQuery } from '../schemas/cards.schema.js'
-import { HttpError } from '../middlewares/error.js'
+import { CardModel } from '../models/card.model.ts'
+import { TagModel } from '../models/tag.model.ts'
+import type { ReadCardsQuery } from '../schemas/cards.schema.ts'
+import { HttpError } from '../middlewares/error.ts'
 
 const PAGE_SIZE = 50
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const toCard = <T extends { _id: { toString(): string } }>({ _id, ...card }: T) => ({
+  id: _id.toString(),
+  ...card,
+})
 
 const ensureTagsBelongToUser = async (ownerId: string, tagIds: string[]) => {
   const uniqueTagIds = [...new Set(tagIds)]
@@ -15,7 +18,7 @@ const ensureTagsBelongToUser = async (ownerId: string, tagIds: string[]) => {
     return
   }
 
-  const count = await TagModel.countDocuments({ ownerId, id: { $in: uniqueTagIds } })
+  const count = await TagModel.countDocuments({ ownerId, _id: { $in: uniqueTagIds } })
   if (count !== uniqueTagIds.length) {
     throw new HttpError(400, 'Uma ou mais tags não existem para este usuário')
   }
@@ -27,18 +30,18 @@ export const cardsRepository = {
     const now = Date.now()
     const docs = cards.map((card, index) => ({
       ...card,
-      id: nanoid(8),
       ownerId,
       date: new Date(card.date),
       timestamp: now + index,
     }))
 
-    await CardModel.insertMany(docs)
-    return docs
+    const created = await CardModel.insertMany(docs)
+    return created.map((doc) => toCard(doc.toObject()))
   },
 
-  readById(ownerId: string, id: string) {
-    return CardModel.findOne({ ownerId, id }).lean()
+  async readById(ownerId: string, id: string) {
+    const card = await CardModel.findOne({ ownerId, _id: id }).lean()
+    return card ? toCard(card) : null
   },
 
   async readByQuery(ownerId: string, { cursor, content, include = [], exclude = [] }: ReadCardsQuery) {
@@ -64,10 +67,12 @@ export const cardsRepository = {
       }
     }
 
-    const cards = await CardModel.find(filter)
+    const docs = await CardModel.find(filter)
       .sort({ timestamp: -1 })
       .limit(PAGE_SIZE)
       .lean()
+
+    const cards = docs.map(toCard)
 
     return {
       cards,
@@ -82,7 +87,7 @@ export const cardsRepository = {
 
     const operations = cards.map(({ id, ...changes }, index) => ({
       updateOne: {
-        filter: { ownerId, id },
+        filter: { ownerId, _id: id },
         update: {
           $set: {
             ...changes,
@@ -97,7 +102,7 @@ export const cardsRepository = {
   },
 
   async deleteByIds(ownerId: string, ids: string[]) {
-    const result = await CardModel.deleteMany({ ownerId, id: { $in: ids } })
+    const result = await CardModel.deleteMany({ ownerId, _id: { $in: ids } })
     return result.deletedCount ?? 0
   },
 
