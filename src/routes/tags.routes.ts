@@ -1,9 +1,11 @@
 import { Router } from 'express'
 
 import { tagsController } from '../controllers/tags.controller.js'
+import { requireAuth } from '../middlewares/auth.js'
 
 export const tagsRoutes = Router()
 
+tagsRoutes.use(requireAuth)
 tagsRoutes.post('/', tagsController.create)
 tagsRoutes.get('/', tagsController.read)
 tagsRoutes.patch('/', tagsController.update)

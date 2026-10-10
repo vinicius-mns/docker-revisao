@@ -11,11 +11,14 @@ const cardInput = z.object({
 })
 
 export const createCardsBody = z.array(cardInput).min(1).max(500)
+
 export const updateCardsBody = z
   .array(cardInput.extend({ id: z.string().min(1) }))
   .min(1)
   .max(500)
+
 export const deleteCardsBody = z.object({ ids: z.array(z.string().min(1)).min(1) })
+
 export const removeTagsBody = z.object({ tagIds: z.array(z.string().min(1)).min(1) })
 
 const csv = z

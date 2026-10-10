@@ -1,22 +1,48 @@
 import { z } from 'zod'
 
 const tagType = z.enum(['include', 'exclude', 'none'])
+const tagIds = z.array(z.string().min(1)).min(1)
 
 const tagInput = z.object({
   emoji: z.string().default(''),
   content: z.string().trim().min(1),
-  count: z.number().int().nonnegative().default(0),
   type: tagType.default('none'),
-  timestamp: z.coerce.number().default(Date.now()),
 })
 
 export const createTagsBody = z.array(tagInput).min(1).max(500)
-export const updateTagsBody = z.array(tagInput.extend({ id: z.string().min(1) })).min(1).max(500)
-export const deleteTagsBody = z.object({ ids: z.array(z.string().min(1)).min(1) })
-export const changeTypeBody = z.object({ ids: z.array(z.string().min(1)).min(1), type: tagType })
-export const setTypeBody = z.array(z.object({ ids: z.array(z.string().min(1)).min(1), type: tagType })).min(1)
-export const incrementCountBody = z.object({ ids: z.array(z.string().min(1)).min(1), by: z.coerce.number().int().default(1) })
-export const decrementCountBody = z.object({ decrements: z.record(z.string(), z.coerce.number().int()) })
+
+export const updateTagsBody = z
+  .array(z.object({
+    id: z.string().min(1),
+    emoji: z.string(),
+    content: z.string().trim().min(1),
+    type: tagType,
+  }))
+  .min(1)
+  .max(500)
+
+export const deleteTagsBody = z.object({ 
+  ids: tagIds
+})
+
+export const changeTypeBody = z.object({
+  ids: tagIds, 
+  type: tagType 
+})
+
+export const setTypeBody = z.array(z.object({ 
+  ids: tagIds, 
+  type: tagType 
+})).min(1)
+
+export const incrementCountBody = z.object({ 
+  ids: tagIds, 
+  by: z.coerce.number().int().default(1) 
+})
+
+export const decrementCountBody = z.object({
+  decrements: z.record(z.string(), z.coerce.number().int()).refine((value) => Object.keys(value).length > 0),
+})
 
 export const readTagsQuery = z.object({
   cursor: z.coerce.number().optional(),

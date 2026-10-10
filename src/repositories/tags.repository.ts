@@ -1,3 +1,5 @@
+import { nanoid } from 'nanoid'
+
 import { CardModel } from '../models/card.model.js'
 import { TagModel } from '../models/tag.model.js'
 import type { ReadTagsQuery } from '../schemas/tags.schema.js'
@@ -7,22 +9,24 @@ const PAGE_SIZE = 5000
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export const tagsRepository = {
-  async create(tags: { emoji: string; content: string; count: number; type: 'include' | 'exclude' | 'none'; timestamp: number }[]) {
+  async create(ownerId: string, tags: { emoji: string; content: string; type: 'include' | 'exclude' | 'none' }[]) {
     const now = Date.now()
     const docs = tags.map((tag, index) => ({
       ...tag,
-      id: crypto.randomUUID().slice(0, 8),
-      timestamp: tag.timestamp ?? now + index,
+      id: nanoid(8),
+      ownerId,
+      count: 0,
+      timestamp: now + index,
     }))
 
     await TagModel.insertMany(docs)
     return docs
   },
 
-  async read({ cursor, content, type }: ReadTagsQuery) {
-    const filter: Record<string, unknown> = {}
+  async read(ownerId: string, { cursor, content, type }: ReadTagsQuery) {
+    const filter: Record<string, unknown> = { ownerId }
 
-    if (cursor) {
+    if (cursor !== undefined) {
       filter.timestamp = { $lt: cursor }
     }
 
@@ -46,10 +50,10 @@ export const tagsRepository = {
     }
   },
 
-  async update(tags: { id: string; emoji: string; content: string; count: number; type: 'include' | 'exclude' | 'none'; timestamp: number }[]) {
+  async update(ownerId: string, tags: { id: string; emoji: string; content: string; type: 'include' | 'exclude' | 'none' }[]) {
     const operations = tags.map(({ id, ...changes }) => ({
       updateOne: {
-        filter: { id },
+        filter: { ownerId, id },
         update: { $set: changes },
       },
     }))
@@ -57,25 +61,25 @@ export const tagsRepository = {
     await TagModel.bulkWrite(operations)
   },
 
-  async deleteByIds(ids: string[]) {
-    const result = await TagModel.deleteMany({ id: { $in: ids } })
+  async deleteByIds(ownerId: string, ids: string[]) {
+    const result = await TagModel.deleteMany({ ownerId, id: { $in: ids } })
     return result.deletedCount ?? 0
   },
 
-  async deleteUnused() {
-    const result = await TagModel.deleteMany({ count: 0 })
+  async deleteUnused(ownerId: string) {
+    const result = await TagModel.deleteMany({ ownerId, count: 0 })
     return result.deletedCount ?? 0
   },
 
-  async changeType(ids: string[], type: 'include' | 'exclude' | 'none') {
-    const result = await TagModel.updateMany({ id: { $in: ids } }, { $set: { type } })
+  async changeType(ownerId: string, ids: string[], type: 'include' | 'exclude' | 'none') {
+    const result = await TagModel.updateMany({ ownerId, id: { $in: ids } }, { $set: { type } })
     return result.modifiedCount ?? 0
   },
 
-  async setType(entries: { ids: string[]; type: 'include' | 'exclude' | 'none' }[]) {
+  async setType(ownerId: string, entries: { ids: string[]; type: 'include' | 'exclude' | 'none' }[]) {
     const operations = entries.map(({ ids, type }) => ({
       updateMany: {
-        filter: { id: { $in: ids } },
+        filter: { ownerId, id: { $in: ids } },
         update: { $set: { type } },
       },
     }))
@@ -84,19 +88,19 @@ export const tagsRepository = {
     return entries.length
   },
 
-  async increment(ids: string[], by = 1) {
+  async increment(ownerId: string, ids: string[], by = 1) {
     const result = await TagModel.updateMany(
-      { id: { $in: ids } },
+      { ownerId, id: { $in: ids } },
       [{ $set: { count: { $max: [0, { $add: ['$count', by] }] } } }],
     )
 
     return result.modifiedCount ?? 0
   },
 
-  async decrement(decrements: Record<string, number>) {
+  async decrement(ownerId: string, decrements: Record<string, number>) {
     const operations = Object.entries(decrements).map(([id, value]) => ({
       updateOne: {
-        filter: { id },
+        filter: { ownerId, id },
         update: [{ $set: { count: { $max: [0, { $subtract: ['$count', value] }] } } }],
       },
     }))
@@ -105,22 +109,25 @@ export const tagsRepository = {
     return Object.keys(decrements).length
   },
 
-  async recount() {
+  async recount(ownerId: string) {
     const counts = await CardModel.aggregate<{ _id: string; count: number }>([
+      { $match: { ownerId } },
       { $unwind: '$tags' },
       { $group: { _id: '$tags', count: { $sum: 1 } } },
     ])
 
-    await TagModel.updateMany({}, { $set: { count: 0 } })
+    await TagModel.updateMany({ ownerId }, { $set: { count: 0 } })
 
-    await TagModel.bulkWrite(
-      counts.map(({ _id, count }) => ({
-        updateOne: {
-          filter: { id: _id },
-          update: { $set: { count } },
-        },
-      })),
-    )
+    if (counts.length) {
+      await TagModel.bulkWrite(
+        counts.map(({ _id, count }) => ({
+          updateOne: {
+            filter: { ownerId, id: _id },
+            update: { $set: { count } },
+          },
+        })),
+      )
+    }
 
     return counts.length
   },

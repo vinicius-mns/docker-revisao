@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 
-import { env } from './env.js'
+import { env } from './env.ts'
 
 export const connectDb = async (uri: string = env.MONGODB_URI) => {
   if (mongoose.connection.readyState === 1) {

@@ -9,6 +9,11 @@ const tagSchema = new Schema(
       unique: true,
       default: () => nanoid(8),
     },
+    ownerId: {
+      type: String,
+      required: true,
+      index: true,
+    },
     emoji: {
       type: String,
       default: '',
@@ -37,7 +42,7 @@ const tagSchema = new Schema(
   },
 )
 
-tagSchema.index({ timestamp: -1 })
+tagSchema.index({ ownerId: 1, timestamp: -1 })
 
 type TagDocument = InferSchemaType<typeof tagSchema>
 

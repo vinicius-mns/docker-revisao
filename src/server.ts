@@ -1,6 +1,6 @@
-import { createApp } from './app.js'
-import { env } from './config/env.js'
-import { connectDb, disconnectDb } from './config/db.js'
+import { createApp } from './app.ts'
+import { env } from './config/env.ts'
+import { connectDb, disconnectDb } from './config/db.ts'
 
 try {
   await connectDb()

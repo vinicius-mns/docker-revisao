@@ -9,6 +9,11 @@ const cardSchema = new Schema(
       unique: true,
       default: () => nanoid(8),
     },
+    ownerId: {
+      type: String,
+      required: true,
+      index: true,
+    },
     date: {
       type: Date,
       required: true,
@@ -32,8 +37,8 @@ const cardSchema = new Schema(
   },
 )
 
-cardSchema.index({ timestamp: -1 })
-cardSchema.index({ tags: 1 })
+cardSchema.index({ ownerId: 1, timestamp: -1 })
+cardSchema.index({ ownerId: 1, tags: 1 })
 
 export type CardDocument = InferSchemaType<typeof cardSchema>
 

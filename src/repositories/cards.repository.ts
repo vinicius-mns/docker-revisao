@@ -1,18 +1,34 @@
 import { nanoid } from 'nanoid'
 
 import { CardModel } from '../models/card.model.js'
+import { TagModel } from '../models/tag.model.js'
 import type { ReadCardsQuery } from '../schemas/cards.schema.js'
+import { HttpError } from '../middlewares/error.js'
 
 const PAGE_SIZE = 50
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+const ensureTagsBelongToUser = async (ownerId: string, tagIds: string[]) => {
+  const uniqueTagIds = [...new Set(tagIds)]
+  if (!uniqueTagIds.length) {
+    return
+  }
+
+  const count = await TagModel.countDocuments({ ownerId, id: { $in: uniqueTagIds } })
+  if (count !== uniqueTagIds.length) {
+    throw new HttpError(400, 'Uma ou mais tags não existem para este usuário')
+  }
+}
+
 export const cardsRepository = {
-  async create(cards: { date: Date; content: string; tags: string[] }[]) {
+  async create(ownerId: string, cards: { date: Date; content: string; tags: string[] }[]) {
+    await ensureTagsBelongToUser(ownerId, cards.flatMap((card) => card.tags))
     const now = Date.now()
     const docs = cards.map((card, index) => ({
       ...card,
       id: nanoid(8),
+      ownerId,
       date: new Date(card.date),
       timestamp: now + index,
     }))
@@ -21,14 +37,14 @@ export const cardsRepository = {
     return docs
   },
 
-  readById(id: string) {
-    return CardModel.findOne({ id }).lean()
+  readById(ownerId: string, id: string) {
+    return CardModel.findOne({ ownerId, id }).lean()
   },
 
-  async readByQuery({ cursor, content, include = [], exclude = [] }: ReadCardsQuery) {
-    const filter: Record<string, unknown> = {}
+  async readByQuery(ownerId: string, { cursor, content, include = [], exclude = [] }: ReadCardsQuery) {
+    const filter: Record<string, unknown> = { ownerId }
 
-    if (cursor) {
+    if (cursor !== undefined) {
       filter.timestamp = { $lt: cursor }
     }
 
@@ -60,12 +76,13 @@ export const cardsRepository = {
     }
   },
 
-  async update(cards: { id: string; date: Date; content: string; tags: string[] }[]) {
+  async update(ownerId: string, cards: { id: string; date: Date; content: string; tags: string[] }[]) {
+    await ensureTagsBelongToUser(ownerId, cards.flatMap((card) => card.tags))
     const now = Date.now()
 
     const operations = cards.map(({ id, ...changes }, index) => ({
       updateOne: {
-        filter: { id },
+        filter: { ownerId, id },
         update: {
           $set: {
             ...changes,
@@ -79,20 +96,20 @@ export const cardsRepository = {
     await CardModel.bulkWrite(operations)
   },
 
-  async deleteByIds(ids: string[]) {
-    const result = await CardModel.deleteMany({ id: { $in: ids } })
+  async deleteByIds(ownerId: string, ids: string[]) {
+    const result = await CardModel.deleteMany({ ownerId, id: { $in: ids } })
     return result.deletedCount ?? 0
   },
 
-  async deleteByTag(tagId: string) {
-    const result = await CardModel.deleteMany({ tags: tagId })
+  async deleteByTag(ownerId: string, tagId: string) {
+    const result = await CardModel.deleteMany({ ownerId, tags: tagId })
     return result.deletedCount ?? 0
   },
 
-  async removeTags(tagIds: string[]) {
-    const counts = await Promise.all(tagIds.map((id) => CardModel.countDocuments({ tags: id })))
+  async removeTags(ownerId: string, tagIds: string[]) {
+    const counts = await Promise.all(tagIds.map((id) => CardModel.countDocuments({ ownerId, tags: id })))
 
-    await CardModel.updateMany({ tags: { $in: tagIds } }, { $pull: { tags: { $in: tagIds } } })
+    await CardModel.updateMany({ ownerId, tags: { $in: tagIds } }, { $pull: { tags: { $in: tagIds } } })
 
     return counts
   },

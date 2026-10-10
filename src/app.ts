@@ -3,10 +3,11 @@ import express from 'express'
 import { rateLimit } from 'express-rate-limit'
 import helmet from 'helmet'
 
-import { env } from './config/env.js'
-import { errorHandler, notFound } from './middlewares/error.js'
-import { cardsRoutes } from './routes/cards.routes.js'
-import { tagsRoutes } from './routes/tags.routes.js'
+import { env } from './config/env.ts'
+import { errorHandler, notFound } from './middlewares/error.ts'
+import { cardsRoutes } from './routes/cards.routes.ts'
+import { tagsRoutes } from './routes/tags.routes.ts'
+import { usersRoutes } from './routes/users.routes.ts'
 
 export const createApp = () => {
   const app = express()
@@ -27,6 +28,7 @@ export const createApp = () => {
 
   app.use('/cards', cardsRoutes)
   app.use('/tags', tagsRoutes)
+  app.use('/users', usersRoutes)
 
   app.use(notFound)
   app.use(errorHandler)
