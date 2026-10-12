@@ -56,4 +56,26 @@ npm run build
 npm test -- --run
 ```
 
-Os testes de rotas usam MongoDB em memória; na primeira execução pode ser necessário baixar o binário do MongoDB.
+Os testes unitários/de rotas usam MongoDB em memória; na primeira execução pode ser necessário baixar o binário do MongoDB.
+
+### Testes de integração com MongoDB e e-mail
+
+Os testes de integração iniciam a API em uma porta local aleatória, fazem requisições HTTP reais, gravam no MongoDB configurado e verificam os e-mails recebidos pelo Mailpit. Eles não enviam mensagens para endereços reais.
+
+1. Copie `.env.integration.example` para `.env.integration`.
+2. Em `MONGODB_URI` e `MONGODB_TEST_URI`, use a conexão do seu MongoDB e um banco **exclusivo para testes**, com nome terminado em `_test` (por exemplo, `docker-revisao_test`). Não use o banco de produção. O teste remove somente o usuário criado por ele.
+3. Inicie o Mailpit local:
+
+   ```sh
+   docker compose -f compose.integration.yml up -d
+   ```
+
+4. Execute os testes:
+
+   ```sh
+   npm run test:integration
+   ```
+
+   As mensagens capturadas podem ser consultadas em <http://localhost:8025>. Para encerrar o Mailpit, execute `docker compose -f compose.integration.yml down`.
+
+O teste exige `SMTP_HOST=127.0.0.1`, a porta `1025` e nenhuma credencial SMTP. Ele falha antes de executar caso o host SMTP não seja local ou a URI não aponte para um banco com sufixo `_test`, evitando o uso acidental de um serviço de e-mail ou banco de produção.
