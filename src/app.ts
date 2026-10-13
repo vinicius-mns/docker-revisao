@@ -13,7 +13,7 @@ export const createApp = () => {
   const app = express()
 
   app.use(helmet())
-  app.use(cors({ origin: env.CORS_ORIGIN }))
+  app.use(cors({ origin: [env.CORS_ORIGIN, env.CORS_ORIGIN_DEV].filter((v): v is string => !!v) }))
   app.use(express.json({ limit: '1mb' }))
   app.use(
     rateLimit({

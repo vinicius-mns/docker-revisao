@@ -9,6 +9,7 @@ export const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   MONGODB_URI: z.string().startsWith('mongodb'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN_DEV: z.string().default('http://localhost:5173'),
   APP_URL: z.string().url().default('http://localhost:3000'),
   WEB_APP_URL: z.string().url().default('http://localhost:5173'),
   SMTP_HOST: optionalString,
