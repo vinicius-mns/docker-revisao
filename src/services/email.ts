@@ -92,7 +92,7 @@ const sendEmail = async (
 }
 
 export const sendVerificationEmail = (email: string, token: string) => {
-  const url = new URL('/users/verify-email', env.APP_URL)
+  const url = new URL('/verify-email', env.WEB_APP_URL)
   url.searchParams.set('token', token)
 
   return sendEmail(
