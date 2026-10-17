@@ -11,6 +11,7 @@ import { usersRoutes } from './routes/users.routes.ts'
 
 export const createApp = () => {
   const app = express()
+  app.set('trust proxy', 1)
 
   app.use(helmet())
   app.use(cors({ origin: [env.CORS_ORIGIN, env.CORS_ORIGIN_DEV].filter((v): v is string => !!v) }))
@@ -26,7 +27,7 @@ export const createApp = () => {
     res.json({ ok: true })
   })
 
-  app.use('/cards', cardsRoutes)
+  app.use('/cards', cardsRoutes)g
   app.use('/tags', tagsRoutes)
   app.use('/users', usersRoutes)
 
