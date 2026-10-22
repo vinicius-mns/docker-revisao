@@ -27,7 +27,7 @@ export const createApp = () => {
     res.json({ ok: true })
   })
 
-  app.use('/cards', cardsRoutes)g
+  app.use('/cards', cardsRoutes)
   app.use('/tags', tagsRoutes)
   app.use('/users', usersRoutes)
 
